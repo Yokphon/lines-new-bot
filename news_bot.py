@@ -2,12 +2,13 @@ import requests
 import feedparser
 import anthropic
 import os
+import google.generativeai as genai
 from datetime import datetime
 
 # ========== Config จาก Environment Variables ==========
 LINE_CHANNEL_TOKEN = os.environ["BPNlwZ0hti4g7INKeftA3P6Hs6Sr4J1IIpe3dyIr+iVkdpJWRak8O3tnfpKC3i9OEdcZBqEyRhhgFnmCDHuXoHtOncH3bu65f5u1zKFW3MuKfkWzCw0ZJS6l2HqT5O9T/BL5SsDCifaqagA0VopMJAdB04t89/1O/w1cDnyilFU="]
 LINE_GROUP_ID = os.environ["LINE_GROUP_ID"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+GEMINI_API_KEY = os.environ["AIzaSyAJz1ATegdUJsz9C-09kTyK6P62kGfs-iQ"]
 
 # ========== RSS Feed แหล่งข่าว ==========
 RSS_FEEDS = {
@@ -48,23 +49,19 @@ def fetch_news(feeds, max_per_feed=3):
     return headlines[:8]
 
 def summarize_with_ai(category, headlines):
-    """ใช้ Claude สรุปข่าวเป็นภาษาไทย"""
     if not headlines:
         return "ไม่พบข่าวในหมวดนี้"
-
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    
     headlines_text = "\n".join(f"- {h}" for h in headlines)
-    prompt = f"""สรุปข่าวหมวด {category} ต่อไปนี้เป็นภาษาไทย กระชับ ไม่เกิน 3 ประเด็นหลัก
-แต่ละประเด็นไม่เกิน 2 บรรทัด เขียนให้เข้าใจง่าย:
+    prompt = f"""สรุปข่าวหมวด {category} ต่อไปนี้เป็นภาษาไทย กระชับ ไม่เกิน 3 ประเด็นหลักแต่ละประเด็นไม่เกิน 2 บรรทัด เขียนให้เข้าใจง่าย:
 
 {headlines_text}"""
-
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=500,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return message.content[0].text
+    
+    response = model.generate_content(prompt)
+    return response.text
 
 def send_to_line(message):
     """ส่งข้อความเข้า LINE กลุ่ม ผ่าน Messaging API"""
