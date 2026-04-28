@@ -1,0 +1,29 @@
+name: Daily News Bot
+
+on:
+  schedule:
+    # ทุกวัน 00:30 UTC = 07:30 น. เวลาไทย (UTC+7)
+    - cron: '30 0 * * *'
+  workflow_dispatch:  # กดรันมือได้ด้วยจาก GitHub
+
+jobs:
+  send-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run news bot
+        env:
+          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python news_bot.py
