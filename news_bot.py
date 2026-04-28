@@ -1,17 +1,15 @@
 import requests
 import feedparser
 import anthropic
-import schedule
-import time
-from datetime import datetime
 import os
+from datetime import datetime
 
-# ========== ตั้งค่าตรงนี้ ==========
-LINE_NOTIFY_TOKEN = os.environ["LINE_NOTIFY_TOKEN"]
+# ========== Config จาก Environment Variables ==========
+LINE_CHANNEL_TOKEN = os.environ["BPNlwZ0hti4g7INKeftA3P6Hs6Sr4J1IIpe3dyIr+iVkdpJWRak8O3tnfpKC3i9OEdcZBqEyRhhgFnmCDHuXoHtOncH3bu65f5u1zKFW3MuKfkWzCw0ZJS6l2HqT5O9T/BL5SsDCifaqagA0VopMJAdB04t89/1O/w1cDnyilFU="]
+LINE_GROUP_ID = os.environ["LINE_GROUP_ID"]
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
-# ====================================
 
-# RSS Feed แหล่งข่าวไทย + ต่างประเทศ
+# ========== RSS Feed แหล่งข่าว ==========
 RSS_FEEDS = {
     "🏛️ การเมืองไทย": [
         "https://www.thairath.co.th/rss/politics.xml",
@@ -47,72 +45,65 @@ def fetch_news(feeds, max_per_feed=3):
                     headlines.append(title)
         except Exception as e:
             print(f"Error fetching {url}: {e}")
-    return headlines[:8]  # ไม่เกิน 8 ข่าวต่อหมวด
+    return headlines[:8]
 
 def summarize_with_ai(category, headlines):
     """ใช้ Claude สรุปข่าวเป็นภาษาไทย"""
     if not headlines:
         return "ไม่พบข่าวในหมวดนี้"
-    
+
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    
     headlines_text = "\n".join(f"- {h}" for h in headlines)
     prompt = f"""สรุปข่าวหมวด {category} ต่อไปนี้เป็นภาษาไทย กระชับ ไม่เกิน 3 ประเด็นหลัก
 แต่ละประเด็นไม่เกิน 2 บรรทัด เขียนให้เข้าใจง่าย:
 
 {headlines_text}"""
-    
+
     message = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}]
     )
     return message.content[0].text
 
 def send_to_line(message):
-    """ส่งข้อความเข้า LINE Notify"""
-    url = "https://notify-api.line.me/api/notify"
-    headers = {"Authorization": f"Bearer {LINE_NOTIFY_TOKEN}"}
-    data = {"message": message}
-    response = requests.post(url, headers=headers, data=data)
+    """ส่งข้อความเข้า LINE กลุ่ม ผ่าน Messaging API"""
+    url = "https://api.line.me/v2/bot/message/push"
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "to": LINE_GROUP_ID,
+        "messages": [{"type": "text", "text": message}]
+    }
+    response = requests.post(url, headers=headers, json=data)
+    print(f"LINE Response: {response.status_code} - {response.text}")
     return response.status_code == 200
 
 def build_and_send_news():
     """ฟังก์ชันหลัก: รวบรวม สรุป และส่งข่าว"""
     print(f"[{datetime.now()}] เริ่มรวบรวมข่าว...")
-    
+
     today = datetime.now().strftime("%d/%m/%Y")
-    full_message = f"\n📰 สรุปข่าวประจำวัน {today}\n{'='*30}\n"
-    
+
+    # ส่งหัวข้อก่อน
+    header = f"📰 สรุปข่าวประจำวัน {today}\n{'='*30}"
+    send_to_line(header)
+
+    # ส่งทีละหมวด เพื่อไม่ให้เกิน limit ของ LINE
     for category, feeds in RSS_FEEDS.items():
         print(f"  กำลังดึงข่าว: {category}")
         headlines = fetch_news(feeds)
         summary = summarize_with_ai(category, headlines)
-        full_message += f"\n{category}\n{summary}\n"
-    
-    full_message += f"\n{'='*30}\n🤖 สรุปโดย AI | {datetime.now().strftime('%H:%M')} น."
-    
-    # LINE มีขีดจำกัด 1000 ตัวอักษรต่อครั้ง
-    # แบ่งส่งถ้าข้อความยาวเกินไป
-    if len(full_message) <= 1000:
-        send_to_line(full_message)
-    else:
-        chunks = [full_message[i:i+950] for i in range(0, len(full_message), 950)]
-        for chunk in chunks:
-            send_to_line(chunk)
-            time.sleep(1)
-    
+        message = f"{category}\n{summary}"
+        send_to_line(message)
+
+    # ส่งปิดท้าย
+    footer = f"{'='*30}\n🤖 สรุปโดย AI | {datetime.now().strftime('%H:%M')} น."
+    send_to_line(footer)
+
     print(f"[{datetime.now()}] ส่งข่าวสำเร็จ!")
 
-# ========== ตั้ง Schedule ==========
-schedule.every().day.at("07:30").do(build_and_send_news)
-
-print("🤖 News Bot เริ่มทำงานแล้ว... รอส่งข่าวทุกเช้า 07:30 น.")
-print("กด Ctrl+C เพื่อหยุด")
-
-# ทดสอบส่งทันทีครั้งแรก (ถ้าต้องการ)
-# build_and_send_news()
-
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+if __name__ == "__main__":
+    build_and_send_news()
