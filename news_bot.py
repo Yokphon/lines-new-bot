@@ -1,13 +1,13 @@
 import requests
 import feedparser
-import google as genai
+from google import genai
 import os
 from datetime import datetime
 
-# ========== Config — ดึงจาก GitHub Secrets อัตโนมัติ ==========
-LINE_CHANNEL_TOKEN = os.environ["LINE_CHANNEL_TOKEN"]   
-LINE_GROUP_ID = os.environ["LINE_GROUP_ID"]             
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]          
+# ========== Config จาก GitHub Secrets ==========
+LINE_CHANNEL_TOKEN = os.environ["LINE_CHANNEL_TOKEN"]
+LINE_GROUP_ID = os.environ["LINE_GROUP_ID"]
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 # ========== RSS Feed แหล่งข่าว ==========
 RSS_FEEDS = {
@@ -49,19 +49,21 @@ def fetch_news(feeds, max_per_feed=3):
 def summarize_with_ai(category, headlines):
     if not headlines:
         return "ไม่พบข่าวในหมวดนี้"
-    
+
     client = genai.Client(api_key=GEMINI_API_KEY)
-    
+
     headlines_text = "\n".join(f"- {h}" for h in headlines)
     prompt = f"""สรุปข่าวหมวด {category} ต่อไปนี้เป็นภาษาไทย กระชับ ไม่เกิน 3 ประเด็นหลัก
 แต่ละประเด็นไม่เกิน 2 บรรทัด เขียนให้เข้าใจง่าย:
+
 {headlines_text}"""
-    
+
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=prompt
     )
     return response.text
+
 def send_to_line(message):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
