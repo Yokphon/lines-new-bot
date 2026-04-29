@@ -1,14 +1,13 @@
 import requests
 import feedparser
-from google import genai
 import os
-from datetime import datetime
 import time
+from datetime import datetime
 
 # ========== Config จาก GitHub Secrets ==========
 LINE_CHANNEL_TOKEN = os.environ["LINE_CHANNEL_TOKEN"]
 LINE_GROUP_ID = os.environ["LINE_GROUP_ID"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 
 # ========== RSS Feed แหล่งข่าว ==========
 RSS_FEEDS = {
@@ -51,19 +50,25 @@ def summarize_with_ai(category, headlines):
     if not headlines:
         return "ไม่พบข่าวในหมวดนี้"
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
-
     headlines_text = "\n".join(f"- {h}" for h in headlines)
     prompt = f"""สรุปข่าวหมวด {category} ต่อไปนี้เป็นภาษาไทย กระชับ ไม่เกิน 3 ประเด็นหลัก
 แต่ละประเด็นไม่เกิน 2 บรรทัด เขียนให้เข้าใจง่าย:
 
 {headlines_text}"""
 
-    response = client.models.generate_content(
-        model="gemini-1.5-flash-8b",
-        contents=prompt
-    )
-    return response.text
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 500
+    }
+    response = requests.post(url, headers=headers, json=data)
+    result = response.json()
+    return result["choices"][0]["message"]["content"]
 
 def send_to_line(message):
     url = "https://api.line.me/v2/bot/message/push"
@@ -92,7 +97,7 @@ def build_and_send_news():
         summary = summarize_with_ai(category, headlines)
         message = f"{category}\n{summary}"
         send_to_line(message)
-        time.sleep(10)
+        time.sleep(3)  # รอ 3 วินาทีระหว่างหมวด
 
     footer = f"{'='*30}\n🤖 สรุปโดย AI | {datetime.now().strftime('%H:%M')} น."
     send_to_line(footer)
