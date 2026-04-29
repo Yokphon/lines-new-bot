@@ -3,6 +3,7 @@ import feedparser
 from google import genai
 import os
 from datetime import datetime
+import time
 
 # ========== Config จาก GitHub Secrets ==========
 LINE_CHANNEL_TOKEN = os.environ["LINE_CHANNEL_TOKEN"]
@@ -91,6 +92,7 @@ def build_and_send_news():
         summary = summarize_with_ai(category, headlines)
         message = f"{category}\n{summary}"
         send_to_line(message)
+        time.sleep(5)
 
     footer = f"{'='*30}\n🤖 สรุปโดย AI | {datetime.now().strftime('%H:%M')} น."
     send_to_line(footer)
