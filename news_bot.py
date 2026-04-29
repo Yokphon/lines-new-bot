@@ -1,6 +1,6 @@
 import requests
 import feedparser
-import google.generativeai as genai
+import google as genai
 import os
 from datetime import datetime
 
@@ -49,19 +49,19 @@ def fetch_news(feeds, max_per_feed=3):
 def summarize_with_ai(category, headlines):
     if not headlines:
         return "ไม่พบข่าวในหมวดนี้"
-
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-
+    
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    
     headlines_text = "\n".join(f"- {h}" for h in headlines)
     prompt = f"""สรุปข่าวหมวด {category} ต่อไปนี้เป็นภาษาไทย กระชับ ไม่เกิน 3 ประเด็นหลัก
 แต่ละประเด็นไม่เกิน 2 บรรทัด เขียนให้เข้าใจง่าย:
-
 {headlines_text}"""
-
-    response = model.generate_content(prompt)
+    
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt
+    )
     return response.text
-
 def send_to_line(message):
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
