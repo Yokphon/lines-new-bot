@@ -60,7 +60,7 @@ def summarize_with_ai(category, headlines):
 {headlines_text}"""
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-1.5-flash-8b",
         contents=prompt
     )
     return response.text
@@ -92,7 +92,7 @@ def build_and_send_news():
         summary = summarize_with_ai(category, headlines)
         message = f"{category}\n{summary}"
         send_to_line(message)
-        time.sleep(5)
+        time.sleep(10)
 
     footer = f"{'='*30}\n🤖 สรุปโดย AI | {datetime.now().strftime('%H:%M')} น."
     send_to_line(footer)
